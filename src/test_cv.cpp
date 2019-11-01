@@ -13,9 +13,11 @@ void colorReduce(cv::Mat image, int div);
 void sharpen(const cv::Mat &image, cv::Mat &result);
 void sharpen2D(const cv::Mat &image,cv::Mat &result);
 
-// 20191029处理图像的颜色
+// 处理图像的颜色20191029
 int pic_filter();
 int grayToColor();
+// 直方图统计像素2191101
+int calc_hist();
 int main(int argc, char** argv)
 {
     // cv_test();
@@ -34,6 +36,10 @@ int main(int argc, char** argv)
     // pic_filter();
     grayToColor();
     return 0;
+}
+int calc_hist()
+{
+    cv::Mat image = cv::imread("../national_day.jpeg",0);
 }
 int grayToColor()
 {
