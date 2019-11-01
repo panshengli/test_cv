@@ -21,12 +21,22 @@ INCLUDE_DIRECTORIES(
 )
 #message("2222222222222",${Pangolin_INCLUDE_DIRS},"111111111111111111111")
 ADD_EXECUTABLE(test_cv src/test_cv.cpp)
+ADD_EXECUTABLE(camshiftdemo src/camshiftdemo.cpp)
+ADD_EXECUTABLE(lkdemo src/lkdemo.cpp)
 TARGET_LINK_LIBRARIES(
     test_cv 
     ${OpenCV_LIBRARIES} 
     ${Sophus_LIBRARIES}
     #${PCL_LIBRARIES} 
     #${Pangolin_LIBRARIES}
+)
+TARGET_LINK_LIBRARIES(
+    camshiftdemo 
+    ${OpenCV_LIBRARIES} 
+)
+TARGET_LINK_LIBRARIES(
+    lkdemo 
+    ${OpenCV_LIBRARIES} 
 )
 #TARGET_LINK_LIBRARIES(main ${libtrans_wc})     #linkage .so
 #MESSAGE(STATUS "This is INCLUDE " ${LIB_TRANS_WORLD_CAMERA})
