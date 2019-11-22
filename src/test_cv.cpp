@@ -18,6 +18,10 @@ int pic_filter();
 int grayToColor();
 // 直方图统计像素2191101
 int calc_hist();
+int binary_solute();
+int picFilter();
+int showImage(cv::Mat );
+
 int main(int argc, char** argv)
 {
     // cv_test();
@@ -34,12 +38,58 @@ int main(int argc, char** argv)
     // cv::imshow("Sharpen2DImage",planes[0]);
     // cv::waitKey(0);
     // pic_filter();
-    grayToColor();
+    // grayToColor();
+    // binary_solute();
+    picFilter();
     return 0;
+}
+int picFilter()
+{
+    cv::Mat image = cv::imread("../highway.jpeg");
+    cv::Mat result,sobelX,sobelY;
+    cv::Mat box_result;
+    cv::Mat gauss_result;
+    cv::blur(image,box_result,cv::Size(5,5));
+    cv::GaussianBlur(image,gauss_result,cv::Size(7,7),2.2);//第三个参数卷积核必须是even
+    cv::Mat reduced(gauss_result.rows/4,gauss_result.cols/4,CV_8U);
+    for(int i=0;i<reduced.rows;i++)
+    {
+        for(int j=0;j<reduced.cols;j++)
+        {
+            reduced.at<uchar>(i,j) = image.at<uchar>(i*4,j*4);
+        }
+    }
+    // cv::pyrUp(image,result);//上采样方法
+    // cv::resize(image,result,cv::Size(),5,5,cv::INTER_NEAREST);//双线性插值
+    cv::Sobel(image,sobelX,CV_8U,1,0,3,0.4,128);//设置sobel为中等灰度
+    cv::medianBlur(image,result,5);
+    showImage(sobelX);
+
+}
+int showImage(cv::Mat trans_image)
+{
+    cv::imshow("shown_win",trans_image);
+    cv::waitKey(0);
+    return 0;
+}
+int binary_solute()
+{
+    cv::Mat image = cv::imread("../highway.jpeg");
+    cv::Mat gray_image,result;
+    cv::cvtColor(image,gray_image,CV_BGR2GRAY);
+    cv::Mat eroded; //erode pic default 3x3 block
+    cv::Mat element(7,7,CV_8U,cv::Scalar(1,1,1));
+    cv::erode(gray_image,eroded,cv::Mat(),cv::Point(1,1),3);
+    cv::Mat dilated; //膨胀pics
+    cv::dilate(image,dilated,cv::Mat());
+    cv::morphologyEx(gray_image,result,cv::MORPH_GRADIENT,cv::Mat());
+    cv::imshow("erode_win",result);
+    cv::waitKey(0);
 }
 int calc_hist()
 {
     cv::Mat image = cv::imread("../national_day.jpeg",0);
+    // cv::calcHist;
 }
 int grayToColor()
 {
