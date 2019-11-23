@@ -1,7 +1,7 @@
 
 #include <opencv2/opencv.hpp>
 
-
+#include <math.h>
 #include <string>
 
 using namespace std;
@@ -21,6 +21,7 @@ int calc_hist();
 int binary_solute();
 int picFilter();
 int showImage(cv::Mat );
+int getLine();
 
 int main(int argc, char** argv)
 {
@@ -40,8 +41,49 @@ int main(int argc, char** argv)
     // pic_filter();
     // grayToColor();
     // binary_solute();
-    picFilter();
+    // picFilter();
+    getLine();
     return 0;
+}
+int getLine()
+{
+    cv::Mat image = cv::imread("../highway.jpeg");
+    cv::resize(image,image,cv::Size(),2,2,cv::INTER_NEAREST);
+    cv::Mat contours;
+    cv::Canny(image,contours,125,350);
+    std::vector<cv::Vec2f> lines;
+    cv::HoughLines(contours,lines,1,M_PI/180,220);
+
+    std::vector<cv::Vec2f>::const_iterator it= lines.begin();
+    while (it!=lines.end())
+    {
+        float rho = (*it)[0];       // 第一个元素是距离 rho
+        float theta = (*it)[1];     // 第二个元素是角度 theta
+        if (theta < M_PI/4. || theta > 2.5*M_PI/4.)
+        {
+            // 垂直线(大致)
+            // 直线与第一行的交叉点
+            cv::Point pt1(rho/cos(theta),0);     
+            // 直线与最后一行的交叉点
+            cv::Point pt2((rho-contours.rows*sin(theta))/cos(theta),contours.rows);  
+            // 画白色的线
+            cv::line( image, pt1, pt2, cv::Scalar(255), 1); 
+        }
+        else
+        {
+            // 水平线(大致)
+            // 直线与第一列的交叉点
+            cv::Point pt1(0,rho/sin(theta));
+            // 直线与最后一列的交叉点
+            cv::Point pt2(contours.cols,(rho-contours.cols*cos(theta))/sin(theta));
+            // 画白色的线
+            cv::line(image, pt1, pt2, cv::Scalar(150,130,2), 1);
+        }
+        ++it;
+    }
+
+    showImage(image);
+
 }
 int picFilter()
 {
