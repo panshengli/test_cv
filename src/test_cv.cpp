@@ -22,7 +22,12 @@ int binary_solute();
 int picFilter();
 int showImage(cv::Mat );
 int getLine();
-
+int cornerHarris();
+int cornerFast();
+// int surfDectector();
+int cornerBrisk();
+int cornerOrb();
+int detectFeature2d();
 int main(int argc, char** argv)
 {
     // cv_test();
@@ -42,9 +47,163 @@ int main(int argc, char** argv)
     // grayToColor();
     // binary_solute();
     // picFilter();
-    getLine();
+    // getLine();
+    // cornerHarris();
+    // cornerFast();
+    // surfDectector();  // 由cv_contri模块实现
+    // cornerBrisk();
+    // cornerOrb();
+    detectFeature2d();
     return 0;
 }
+int detectFeature2d()
+{
+    cv::Mat image1 = cv::imread("../pic_l.jpg");
+    cv::Mat image2 = cv::imread("../pic_r.jpg");
+    cv::Mat image3 = cv::imread("../1.png");
+    cv::Mat image4 = cv::imread("../2.png");
+    // 定义关键点容器和描述子
+    std::vector<cv::KeyPoint> keypoints1;
+    std::vector<cv::KeyPoint> keypoints2;
+    cv::Mat descriptors1;
+    cv::Mat descriptors2;
+    // 定义特征检测器/描述子
+    // Construct the ORB feature object
+    cv::Ptr<cv::Feature2D> feature = cv::ORB::create(80);    // 大约 60 个特征点
+    // 检测并描述关键点
+    // 检测 ORB 特征
+    feature->detectAndCompute(image1, cv::noArray(),
+    keypoints1, descriptors1);
+    feature->detectAndCompute(image2, cv::noArray(),
+    keypoints2, descriptors2);
+    // 构建匹配器
+    cv::BFMatcher matcher(cv::NORM_HAMMING); // 二值描述子一律使用 Hamming 规范
+    // 匹配两幅图像的描述子
+    std::vector<cv::DMatch> matches;
+    matcher.match(descriptors1, descriptors2, matches);
+    cv::Mat result_image;
+    // 画出匹配线
+    cv::drawMatches(image1,keypoints1,         // 第一幅图像
+        image2,keypoints2,                     // 第二幅图像
+        matches,
+        result_image,                                      // 匹配项的向量
+        cv::Scalar(255,255,255),               // 线条颜色
+        cv::Scalar(255,255,255));              // 点的颜色
+    showImage(result_image);
+}
+int cornerOrb()
+{
+    cv::Mat image = cv::imread("../highway.jpeg");
+    // 关键点的向量
+    std::vector<cv::KeyPoint> keypoints;
+    // 构造 ORB 特征检测器对象
+    cv::Ptr<cv::ORB> ptrORB =
+    cv::ORB::create(75,  // 关键点的总数
+        1.2,             // 图层之间的缩放因子
+        8);              // 金字塔的图层数量
+    // 检测关键点
+    ptrORB->detect(image, keypoints);    
+    // 画出关键点,包括尺度和方向信息
+    cv::drawKeypoints(image,
+        keypoints,                                       // 原始图像
+        image,                                           // 关键点的向量
+        cv::Scalar(255,255,255),                         // 结果图像
+        cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);      // 点的颜色
+    showImage(image);
+}
+int cornerBrisk()
+{
+    cv::Mat image = cv::imread("../highway.jpeg");
+    // 关键点的向量
+    std::vector<cv::KeyPoint> keypoints;
+    // 构造 BRISK 特征检测器对象
+    cv::Ptr<cv::BRISK> ptrBRISK = cv::BRISK::create();
+    // 检测关键点
+    ptrBRISK->detect(image, keypoints);
+    // 画出关键点,包括尺度和方向信息
+    cv::drawKeypoints(image,
+        // 原始图像
+        keypoints,
+        // 关键点的向量
+        image,
+        // 结果图像
+        cv::Scalar(255,255,255),
+        // 点的颜色
+        cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+    showImage(image);
+}
+// // cv_contri模块
+// int surfDetector()
+// {
+//     cv::Mat image = cv::imread("../highway.jpeg");
+//     // 创建 SURF 特征检测器对象
+//     cv::Ptr<cv::xfeatures2d::SurfFeatureDetector> ptrSURF =
+//     cv::xfeatures2d::SurfFeatureDetector::create(2000.0);
+//     // 检测关键点
+//     ptrSURF->detect(image, keypoints);
+//     // 画出关键点,包括尺度和方向信息
+//     cv::drawKeypoints(image,
+//         // 原始图像
+//         keypoints,
+//         // 关键点的向量
+//         featureImage,
+//         // 结果图像
+//         cv::Scalar(255,255,255),
+//         // 点的颜色
+//         cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+//     showImage(image);
+// }
+int cornerFast()
+{
+    cv::Mat image = cv::imread("../highway.jpeg");
+    cv::Mat gray_image;
+    cv::cvtColor(image,gray_image,CV_BGR2GRAY);
+    // 关键点的向量
+    std::vector<cv::KeyPoint> keypoints;
+    // FAST 特征检测器,阈值为 40
+    cv::Ptr<cv::FastFeatureDetector> ptrFAST =
+    cv::FastFeatureDetector::create(40);
+    // 检测关键点
+    ptrFAST->detect(image,keypoints);
+    cv::drawKeypoints(image,
+        keypoints,
+        image,
+        cv::Scalar(255,255,255),
+        cv::DrawMatchesFlags::DRAW_OVER_OUTIMG);
+    showImage(image);
+}
+
+int cornerHarris()
+{
+    cv::Mat image = cv::imread("../highway.jpeg");
+    cv::Mat gray_image;
+    cv::cvtColor(image,gray_image,CV_BGR2GRAY);
+    // 检测 Harris 角点
+    cv::Mat cornerStrength;
+    cv::cornerHarris(gray_image,cornerStrength,3,3,0.01);
+    // 对角点强度阈值化
+    cv::Mat harrisCorners;
+    double threshold= 0.0001;
+    cv::threshold(cornerStrength,harrisCorners,threshold,255,cv::THRESH_BINARY_INV);
+
+    std::vector<cv::KeyPoint> keypoints;
+    // GFTT检测器
+    cv::Ptr<cv::GFTTDetector>ptrGFTT = 
+        cv::GFTTDetector::create(
+            500,
+            0.01,
+            10
+        );
+    // 检测 GFTT
+    ptrGFTT->detect(image,keypoints);
+    cv::drawKeypoints(image,
+        keypoints,
+        image,
+        cv::Scalar(255,255,255),
+        cv::DrawMatchesFlags::DRAW_OVER_OUTIMG);
+    showImage(image);
+}
+
 int getLine()
 {
     cv::Mat image = cv::imread("../highway.jpeg");
