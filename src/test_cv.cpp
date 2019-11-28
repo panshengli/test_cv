@@ -28,6 +28,9 @@ int cornerFast();
 int cornerBrisk();
 int cornerOrb();
 int detectFeature2d();
+int execStitcher();
+int cvViz();
+
 int main(int argc, char** argv)
 {
     // cv_test();
@@ -54,8 +57,64 @@ int main(int argc, char** argv)
     // cornerBrisk();
     // cornerOrb();
     detectFeature2d();
+    // execStitcher();
+    // cvViz();
     return 0;
 }
+int cvViz()
+{
+    cv::Mat image1 = cv::imread("../pic_l.jpg");
+    // 创建 viz 窗口
+    cv::viz::Viz3d visualizer("Viz window");
+    visualizer.setBackgroundColor(cv::viz::Color::white());
+    // 创建一个虚拟相机
+    cv::Matx33d cMatrix;
+    cv::viz::WCameraPosition cam(
+    cMatrix,  // 内部参数矩阵
+    image1,    // 平面上显示的图像
+    30.0,     // 缩放因子
+    cv::viz::Color::black());
+    // 在环境中添加虚拟相机
+    visualizer.showWidget("Camera", cam);
+    // 用长方体表示虚拟的长椅
+    cv::viz::WCube plane1(cv::Point3f(0.0, 45.0, 0.0),
+    cv::Point3f(242.5, 21.0, -9.0),
+    true,    // 显示线条框架
+    cv::viz::Color::blue());
+    plane1.setRenderingProperty(cv::viz::LINE_WIDTH, 4.0);
+    cv::viz::WCube plane2(cv::Point3f(0.0, 9.0, -9.0),
+        cv::Point3f(242.5, 0.0, 44.5),
+        true, // 显示线条框架
+        cv::viz::Color::blue());
+    plane2.setRenderingProperty(cv::viz::LINE_WIDTH, 4.0);
+    // 把虚拟物体加入到环境中
+    visualizer.showWidget("top", plane1);
+    visualizer.showWidget("bottom", plane2);
+    // 循环显示
+    while(cv::waitKey(100)==-1 && !visualizer.wasStopped()) 
+    {
+        visualizer.spinOnce(1,     // 暂停 1 毫秒
+        true);                     // 重绘
+    }
+}
+int execStitcher()
+{
+    cv::Mat image1 = cv::imread("../pic_l.jpg");
+    cv::Mat image2 = cv::imread("../pic_r.jpg");
+    cv::Mat image3 = cv::imread("../1.png");
+    cv::Mat image4 = cv::imread("../2.png");
+    // 读取输入的图像
+    std::vector<cv::Mat> images;
+    images.push_back(image3);
+    images.push_back(image4);
+    cv::Mat panorama; // 输出的全景图
+    // 创建拼接器
+    cv::Stitcher stitcher = cv::Stitcher::createDefault();
+    // 拼接图像
+    cv::Stitcher::Status status = stitcher.stitch(images, panorama);
+    showImage(panorama);
+}
+
 int detectFeature2d()
 {
     cv::Mat image1 = cv::imread("../pic_l.jpg");
@@ -69,26 +128,100 @@ int detectFeature2d()
     cv::Mat descriptors2;
     // 定义特征检测器/描述子
     // Construct the ORB feature object
-    cv::Ptr<cv::Feature2D> feature = cv::ORB::create(80);    // 大约 60 个特征点
+    cv::Ptr<cv::Feature2D> feature = cv::ORB::create(60);    // 大约 60 个特征点
     // 检测并描述关键点
     // 检测 ORB 特征
-    feature->detectAndCompute(image1, cv::noArray(),
+    feature->detectAndCompute(image3, cv::noArray(),
     keypoints1, descriptors1);
-    feature->detectAndCompute(image2, cv::noArray(),
+    feature->detectAndCompute(image4, cv::noArray(),
     keypoints2, descriptors2);
     // 构建匹配器
     cv::BFMatcher matcher(cv::NORM_HAMMING); // 二值描述子一律使用 Hamming 规范
     // 匹配两幅图像的描述子
     std::vector<cv::DMatch> matches;
     matcher.match(descriptors1, descriptors2, matches);
+    // 将关键点转换成 Point2f 类型
+    std::vector<cv::Point2f> points1, points2;
+    for (std::vector<cv::DMatch>::const_iterator it =
+        matches.begin(); it != matches.end(); ++it)
+    {
+        // 获取左侧关键点的位置
+        float x = keypoints1[it->queryIdx].pt.x;     //queryIdx为关键点的索引
+        float y = keypoints1[it->queryIdx].pt.y;
+        points1.push_back(cv::Point2f(x, y));
+        // 获取右侧关键点的位置
+        x = keypoints2[it->trainIdx].pt.x;
+        y = keypoints2[it->trainIdx].pt.y;
+        points2.push_back(cv::Point2f(x, y));
+    }
+    // 找出 image1 和 image2 之间的本质矩阵
+    cv::Mat inliers;
+    cv::Mat Matrix = (cv::Mat_<double> (3,3)<<520.9,0,325.1,0,521.0,249.7,0,0,1);
+    std::cout<<"Matrix is "<<std::endl<<Matrix<<std::endl;
+    cv::Mat essential = cv::findEssentialMat(points1, points2,
+        Matrix,       // 内部参数
+        cv::RANSAC,   // RANSAC 方法
+        0.9, 1.0, 
+        inliers);     // 提取到的内点
+    std::cout<<inliers.size()<<endl;
+    // 根据本质矩阵还原相机的相对姿态
+    cv::Mat rotation, translation;    
+    cv::recoverPose(essential,      // 本质矩阵
+        points1, points2,           // 匹配的关键点
+        Matrix,                     // 内部矩阵
+        rotation, translation,      // 计算的移动值
+        inliers);                   // 内点匹配项
+    std::cout<<"Rotation is "<<std::endl<<rotation<<std::endl;
+    std::cout<<"Translation is "<<std::endl<<translation<<std::endl;
+    // 根据旋转量 R 和平移量 T 构建投影矩阵
+    cv::Mat projection2(3, 4, CV_64F); // 3×4 的投影矩阵
+    rotation.copyTo(projection2(cv::Rect(0, 0, 3, 3))
+    translation.copyTo(projection2.colRange(3, 4));
+    // 构建通用投影矩阵
+    cv::Mat projection1(3, 4, CV_64F, 0.); // 3×4 的投影矩阵
+    cv::Mat diag(cv::Mat::eye(3, 3, CV_64F));
+    diag.copyTo(projection1(cv::Rect(0, 0, 3, 3)));
+    // 用于存储内点
+    std::vector<cv::Vec2d> inlierPts1;
+    std::vector<cv::Vec2d> inlierPts2;
+    // 创建输入内点的容器,用于三角剖分
+    int j(0);
+    for (int i = 0; i < inliers.rows; i++) 
+    {
+        if (inliers.at<uchar>(i)) 
+        {
+            inlierPts1.push_back(cv::Vec2d(points1[i].x, points1[i].y));
+            inlierPts2.push_back(cv::Vec2d(points2[i].x, points2[i].y));
+    }
+}
+
+
     cv::Mat result_image;
     // 画出匹配线
-    cv::drawMatches(image1,keypoints1,         // 第一幅图像
-        image2,keypoints2,                     // 第二幅图像
+    cv::drawMatches(image3,keypoints1,         // 第一幅图像
+        image4,keypoints2,                     // 第二幅图像
         matches,
         result_image,                                      // 匹配项的向量
         cv::Scalar(255,255,255),               // 线条颜色
         cv::Scalar(255,255,255));              // 点的颜色
+    // // 找到第一幅图像和第二幅图像之间的单应矩阵
+    // std::vector<char> inliers;
+    // cv::Mat homography= cv::findHomography(
+    //     keypoints1,
+    //     keypoints2, // 对应的点
+    //     inliers,    // 输出的局内匹配项
+    //     cv::RANSAC, // RANSAC 方法
+    //     1.);        // 到重复投影点的最大距离
+
+    // // 将第一幅图像扭曲到第二幅图像
+    // cv::Mat result;
+    // cv::warpPerspective(image1,        // 输入图像
+    //     result,                        // 输出图像
+    //     homography,                    // 单应矩阵
+    //     cv::Size(2*image1.cols,image1.rows));
+    // // 把第一幅图像复制到完整图像的第一个半边
+    // cv::Mat half(result,cv::Rect(0,0,image2.cols,image2.rows));
+    // image2.copyTo(half);      // 把 image2 复制到 image1 的 ROI 区域
     showImage(result_image);
 }
 int cornerOrb()
