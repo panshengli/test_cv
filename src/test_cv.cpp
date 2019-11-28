@@ -3,6 +3,9 @@
 
 #include <math.h>
 #include <string>
+#include <time.h>
+#include <unistd.h>
+#include <iostream>
 
 using namespace std;
 
@@ -14,14 +17,14 @@ void sharpen(const cv::Mat &image, cv::Mat &result);
 void sharpen2D(const cv::Mat &image,cv::Mat &result);
 
 // 处理图像的颜色20191029
-int pic_filter();
+cv::Mat pic_filter(cv::Mat&);
 int grayToColor();
 // 直方图统计像素2191101
 int calc_hist();
 int binary_solute();
 int picFilter();
 int showImage(cv::Mat );
-int getLine();
+cv::Mat getLine(cv::Mat&);
 int cornerHarris();
 int cornerFast();
 // int surfDectector();
@@ -30,6 +33,8 @@ int cornerOrb();
 int detectFeature2d();
 int execStitcher();
 int cvViz();
+int getVideoFrame();
+cv::Mat processCanny(cv::Mat& img, cv::Mat& out);
 
 int main(int argc, char** argv)
 {
@@ -56,10 +61,66 @@ int main(int argc, char** argv)
     // surfDectector();  // 由cv_contri模块实现
     // cornerBrisk();
     // cornerOrb();
-    detectFeature2d();
+    // detectFeature2d();
     // execStitcher();
     // cvViz();
+    getVideoFrame();
     return 0;
+}
+int getVideoFrame()
+{
+    // 打开视频文件
+    cv::VideoCapture capture("../../../data/road_test.mp4");
+    // 检查视频是否成功打开
+    double rate= capture.get(CV_CAP_PROP_FPS);
+    std::cout<<"fps is "<< rate<<std::endl;
+    int delay = 100/rate;
+    if (!capture.isOpened())
+        return 1;
+    // 取得帧速率
+    bool stop(false);
+    cv::Mat frame; // 当前视频帧
+    cv::namedWindow("Extracted Frame");
+    // 根据帧速率计算帧之间的等待时间,单位为 ms
+    
+    // 循环遍历视频中的全部帧
+    clock_t s_time, e_time;
+    cv::Mat result;
+    while (!stop) 
+    {
+        // s_time=clock();    // 打印函数耗时开始
+        // 读取下一帧(如果有)
+        if (!capture.read(frame))
+            break;
+        // cv::imshow("Extracted Frame",frame); 
+        // cv::imshow("Extracted Frame",processCanny(frame,result)); 
+        // cv::imshow("Extracted Frame",pic_filter(frame)); 
+        cv::imshow("Extracted Frame",getLine(frame)); 
+        // 等待一段时间,或者通过按键停止
+        if (cv::waitKey(delay)>=0)
+        {
+            stop = true;
+        } 
+        // s_time=clock();    // 打印函数耗时开始
+        // sleep(1);
+        // e_time=clock();    // 打印函数耗时结束
+        // std::cout<<"Exec time: "<<(double)(e_time-s_time)/CLOCKS_PER_SEC*1000.<<" ms"<<std::endl;
+    }
+    // 关闭视频文件
+    // 不是必须的,因为类的析构函数会调用
+    capture.release();
+    return 0;
+}
+cv::Mat processCanny(cv::Mat& img, cv::Mat& out)
+{
+    // 转换成灰度图像
+    if (img.channels()==3)
+    cv::cvtColor(img,out,cv::COLOR_BGR2GRAY);
+    // 计算 Canny 边缘
+    cv::Canny(out,out,50,200);
+    // 反转图像
+    cv::threshold(out,out,128,255,cv::THRESH_BINARY_INV);
+    return out;
 }
 int cvViz()
 {
@@ -175,7 +236,7 @@ int detectFeature2d()
     std::cout<<"Translation is "<<std::endl<<translation<<std::endl;
     // 根据旋转量 R 和平移量 T 构建投影矩阵
     cv::Mat projection2(3, 4, CV_64F); // 3×4 的投影矩阵
-    rotation.copyTo(projection2(cv::Rect(0, 0, 3, 3))
+    rotation.copyTo(projection2(cv::Rect(0, 0, 3, 3)));
     translation.copyTo(projection2.colRange(3, 4));
     // 构建通用投影矩阵
     cv::Mat projection1(3, 4, CV_64F, 0.); // 3×4 的投影矩阵
@@ -337,21 +398,21 @@ int cornerHarris()
     showImage(image);
 }
 
-int getLine()
+cv::Mat getLine(cv::Mat& image)
 {
-    cv::Mat image = cv::imread("../highway.jpeg");
-    cv::resize(image,image,cv::Size(),2,2,cv::INTER_NEAREST);
+    // cv::Mat image = cv::imread("../highway.jpeg");
+    // cv::resize(image,image,cv::Size(),2,2,cv::INTER_NEAREST);
     cv::Mat contours;
-    cv::Canny(image,contours,125,350);
+    cv::Canny(image,contours,150,200);
     std::vector<cv::Vec2f> lines;
-    cv::HoughLines(contours,lines,1,M_PI/180,220);
+    cv::HoughLines(contours,lines,1,M_PI/180,300);
 
     std::vector<cv::Vec2f>::const_iterator it= lines.begin();
     while (it!=lines.end())
     {
         float rho = (*it)[0];       // 第一个元素是距离 rho
         float theta = (*it)[1];     // 第二个元素是角度 theta
-        if (theta < M_PI/4. || theta > 2.5*M_PI/4.)
+        if (theta > M_PI/3. && theta < 3*M_PI/4.)
         {
             // 垂直线(大致)
             // 直线与第一行的交叉点
@@ -361,20 +422,20 @@ int getLine()
             // 画白色的线
             cv::line( image, pt1, pt2, cv::Scalar(255), 1); 
         }
-        else
-        {
-            // 水平线(大致)
-            // 直线与第一列的交叉点
-            cv::Point pt1(0,rho/sin(theta));
-            // 直线与最后一列的交叉点
-            cv::Point pt2(contours.cols,(rho-contours.cols*cos(theta))/sin(theta));
-            // 画白色的线
-            cv::line(image, pt1, pt2, cv::Scalar(150,130,2), 1);
-        }
+        // else
+        // {
+        //     // 水平线(大致)
+        //     // 直线与第一列的交叉点
+        //     cv::Point pt1(0,rho/sin(theta));
+        //     // 直线与最后一列的交叉点
+        //     cv::Point pt2(contours.cols,(rho-contours.cols*cos(theta))/sin(theta));
+        //     // 画白色的线
+        //     cv::line(image, pt1, pt2, cv::Scalar(150,130,2), 1);
+        // }
         ++it;
     }
 
-    showImage(image);
+    return image;
 
 }
 int picFilter()
@@ -434,29 +495,29 @@ int grayToColor()
     cv::waitKey(0);
     return 0;
 }
-int pic_filter()
+cv::Mat pic_filter(cv::Mat& image)
 {
-    // 2.读取输入的图像
-    cv::Mat image= cv::imread("../highway.jpeg");
-    if (image.empty()) 
-        return 0;
-    // 3.设置输入参数
+    // // 2.读取输入的图像
+    // cv::Mat image= cv::imread("../highway.jpeg");
+    // if (image.empty()) 
+    //     return 0;
+    // // 3.设置输入参数
     for (int i=0;i<255;i++)
     {
         cv::floodFill(image,
-                    cv::Point(100, 250),
+                    cv::Point(570, 386),
                     cv::Scalar(i, i, 0),
                     (cv::Rect*)0,
                     cv::Scalar(35, 35, 35),
                     cv::Scalar(35, 35, 35),
                     cv::FLOODFILL_FIXED_RANGE);
         
-        cv::namedWindow("result");
-        cv::imshow("result",image);
-        cv::waitKey(50);
+        // cv::namedWindow("result");
+        // cv::imshow("result",image);
+        // cv::waitKey(50);
     }
-    cv::waitKey(0);
-    return 1;
+    // cv::waitKey(0);
+    return image;
 }
 void sharpen2D(const cv::Mat &image,cv::Mat &result)
 {
