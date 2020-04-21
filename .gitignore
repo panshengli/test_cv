@@ -8,7 +8,6 @@
 *.slo
 *.lo
 *.obj
-#vslam map data is .bin, comment out
 #*.bin
 
 # CMAKE TEMPORARY FILES
@@ -21,7 +20,7 @@ CMakeFiles/*
 # commented the below to make sure the build folder can be committed.
 # ps: parking_slot_detection should be refactored in near future.
 #build/
-#build/*
+build/*
 
 # ROS GENERATED PRODUCTS
 msg_gen/
@@ -100,12 +99,4 @@ libloc_fusion.so
 build_isolate/
 devel_isolate/
 /build/
-/backup/
-slot_patch/
 
-_env.txt
-mission_control_center.log
-yada_validation_log.txt
-_ssd_output/
-libibeosdk.a
-ros-kinetic-car-cloud.sh
