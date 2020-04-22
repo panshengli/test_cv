@@ -25,6 +25,8 @@ ADD_EXECUTABLE(camshiftdemo src/camshiftdemo.cpp)
 ADD_EXECUTABLE(lkdemo src/lkdemo.cpp)
 ADD_EXECUTABLE(find_var_from_vector src/find_var_from_vector.cpp)
 ADD_EXECUTABLE(call_func src/call_func.cpp)
+ADD_EXECUTABLE(static_class src/static_class.cpp)
+ADD_EXECUTABLE(sizeof src/sizeof.cpp)
 TARGET_LINK_LIBRARIES(
     test_cv 
     ${OpenCV_LIBRARIES} 
